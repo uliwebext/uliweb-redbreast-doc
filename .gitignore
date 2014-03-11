@@ -34,3 +34,22 @@ nosetests.xml
 .mr.developer.cfg
 .project
 .pydevproject
+
+
+# Ulipad configuration
+_project
+
+#Sublime configuration
+*.sublime-project
+*.sublime-workspace
+
+#speical filter
+#sandbox*.py
+#Sandbox*.config
+database.db
+*.*~
+
+#uliweb project
+alembic
+sessions
+uploads

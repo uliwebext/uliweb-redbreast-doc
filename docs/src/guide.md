@@ -1,7 +1,8 @@
 # 快速上手
 
 ## BatchDemo示例 ##
-这一篇文章里，我们通过一点一点的修改 `BatchDemo` 例子，来了解一下`redbreast`中基本的函数和用法。`BatchDemo` 是一个简单的 Python 程序，定义一个工作流，
+
+这一篇文章里，我们通过一点一点的修改 `BatchDemo` 例子，来了解一下`redbreast`中最基本的函数和用法。`BatchDemo` 是一个简单的 Python 程序，定义一个工作流，
 完成一系列的任务。使用`redbreast`来加载各个任务，完成一个统一的流程。
 
 ## 定义流程 ##
@@ -21,7 +22,7 @@
     task S4:
     end
     
-    process BatchWorkflow01:
+    workflow BatchWorkflow01:
     	flows:
     		S1 -> S2 -> S3 -> S4
     	end
@@ -37,16 +38,16 @@
 
 ## 撰写代码 ##
 
-模块引入
+首先，需要模块引入
 
 	from redbreast.core.spec import CoreWFManager
 	from redbreast.core import Task, Workflow
 
-我们需要引入这样几个对象:
+我们引入了这样几个对象:
 
  * `CoreWFManager` 
  
- 全局唯一的对象，用于管理工作流定义，缺省的存储storage使用的是从当前脚本的目录下读取.spec文件来加载工作流定义。在后面的例子中，如果我们按照uliwebapp的方式引入redbreast的包之后，缺省的storage则会是数据库。
+ 全局唯一的对象，用于管理工作流定义，缺省的存储storage使用的是从当前脚本的spec子目录下读取.spec文件来加载工作流定义(要求工作流的名称和保存的文件名是一致的)。在后面的例子中，如果我们按照uliwebapp的方式引入redbreast的包之后，缺省的storage则会是数据库。
 
  * `Task`, `Workflow`
  
@@ -56,7 +57,7 @@
 
 	workflow_spec = CoreWFManager.get_workflow_spec('BatchWorkflow01')
 
-事件绑定，我们只是在各个任务执行的时候，输出一句日志。
+事件绑定，这里只是在各个任务执行的时候，输出一句日志。
 	
 	def event_log(event):
     	print " -> spec %s, %s" % (event.task.get_name(), event.type)
@@ -78,9 +79,115 @@
 
 ## 增加逻辑 ##
 
-下面，我们通过几种方式，在各个任务中，增加我们自己的业务逻辑。
+### 怎么增加逻辑代码 ###
 
-方法一，直接在spec中定义，适合于一些简单逻辑，修改S1如下
+下面，通过几种方式，在各个任务中，增加我们自己的业务逻辑。
+
+方法一，直接在spec中定义，适合于一些简单逻辑，修改task_spec:S1如下
 
     task S1
-        
+        code execute:
+            print "Task S1 executed, defined in task"
+            print task
+            print workflow
+            return DONE
+        end
+    end
+
+或者修改workflow_spec如下：
+
+    #批处理
+    workflow BatchWorkflow02:
+        #流向定义
+        flows:
+            S1 -> S2 -> S3 -> S4
+        end
+        code S2.execute:
+            print "Task S2 executed, defined in process"
+            return DONE
+        end
+    end        
+
+我们可以在task_spec或者workflow_spec中直接定义简单的execute代码，返回值DONE是表示通知工作流继续执行transfer到下一个结点的操作。代码的上下文中缺省的包括两个参数task, workflow, 分别是当前的任务 *实例*和工作流 *实例*。如果task_spec, workflow_spec 都定义了某个任务的代码，workflow_spec 中定义的代码，有更高的优先级。
+
+如果我们的逻辑很复杂，就不适合在此处直接撰写了。我们可以去增加一个新的TaskSpec类来做这个事。
+
+方法二，使用自定义的TaskSpec类，重写default_execute方法，示例如下：
+
+```
+from redbreast.core.spec import AutoSimpleTask
+from redbreast.core.spec import DONE
+
+class CustomTask(AutoSimpleTask):
+    def default_execute(self, task, workflow):
+        print "Task %s executed, defined in CustomClass."%task.get_spec_name()
+        return DONE
+```
+
+然后修改spec文件中的task_spec:S3的任务如下：
+
+    #第三步
+    task S3:
+        class : mytask.CustomTask
+    end
+
+最终程序的输出结果是这样的：
+
+```
+Task S1 executed, defined in task
+<Task (S1) in state READY at 0x1fc6090>
+<redbreast.core.workflow.Workflow object at 0x01FC6A30>
+Task S2 executed, defined in process
+Task S3 executed, defined in CustomClass.
+```
+
+这几种方法的优先级是这样的，workflow_spec定义最高，task_spec定义其次，类中的default_execute最次，如果有几种定义都存在，只有优先级高的会被执行，其他的就被忽略了。
+
+### 怎么在工作流任务间中保留和传递数据
+
+有些时候，两步任务之间，需要有一些数据和参数交换，在redbreast中如何实现呢？
+
+数据定义有两种，一种是直接定义在spec文件中，比如直接写到task_spec里或者 workflow_spec，如下面的d1，d2, d3。这些数据会在所有的同一个spec生成的工作流之间共享，适用于一些配置项，固定参数之类，只读为主。如果某个工作流修改了其中的数据。其他的工作流也会得到新的数据。另一种，是在运行的代码中，通过set_data存储到task或者workflow的实例中去。我们可以根据运行态的数据不同，写入不同的数据。
+
+    task S1:
+        d1 : s1-d1
+        d2 : s1-d2
+        code execute:
+            print "Task S1 executed, defined in task"
+            print "  > d1 from task_spec:%s" % task.get_spec_data("d1")
+            print "  > d2 from task_spec:%s" % task.get_spec_data("d2")
+            print "  > d3 from workflow_spec:%s" % workflow.get_spec_data("d3")
+            task.set_data("c1", "s1-c1")
+            workflow.set_data("c2", "s1-c2")
+            return DONE
+        end
+    end
+    ...
+    #批处理
+    workflow BatchWorkflow03:
+        d3 : data3
+        ...
+        code S2.execute:
+            print "Task S2 executed, defined in process"
+            print "  > d1 from task_spec:%s" % task.get_spec_data("d1")
+            print "  > d2 from task_spec:%s" % task.get_spec_data("d2")
+            print "  > d3 from workflow_spec:%s" % workflow.get_spec_data("d3")
+            print "  > c1 from task-S1:%s" % task.parents[0].get_data("c1")
+            print "  > c2 from workflow:%s" % workflow.get_data("c2")
+            return DONE
+        end
+    end
+
+使用的方法如下：
+
+* 第一种数据
+ - 任务实例, 读：get_spec_data(key)，写：set_spec_data(key, value)
+ - 工作流实例，读：get_spec_data(key)，写：set_spec_data(key, value)
+
+* 第二种数据
+ - 任务实例, 读：get_data(key)，写：set_data(key, value)
+ - 工作流实例，读：get_data(key)，写：set_data(key, value)
+
+### 更复杂的例子，一个有分支的示例
+
+有了数据的传递，我们就可以动态的修改工作流的走向，下面我们来定义一个有简单分支的工作流，有两条分支，运行中，随机选择一条路径来走。

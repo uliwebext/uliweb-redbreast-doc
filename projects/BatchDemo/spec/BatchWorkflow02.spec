@@ -1,7 +1,9 @@
     #第一步
     task S1:
         code execute:
-            print "S1 executed"
+            print "Task S1 executed, defined in task"
+            print task
+            print workflow
             return DONE
         end
     end
@@ -12,6 +14,7 @@
 
     #第三步
     task S3:
+        class : mytask.CustomTask
     end
 
     #第四步
@@ -19,14 +22,15 @@
     end
 
     #批处理
-    process BatchWorkflow:
+    process BatchWorkflow02:
         #流向定义
         flows:
             S1 -> S2 -> S3 -> S4
         end
 
         code S2.execute:
-            print "S2 executed"
+            print "Task S2 executed, defined in process"
             return DONE
         end
+
     end

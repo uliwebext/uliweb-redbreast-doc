@@ -51,7 +51,7 @@
 
  * `Task`, `Workflow`
  
- 活动实例，和工作流实例对象。在运行中，我们会根据刚刚定义的工作流来生成这些对象。
+ 活动实例和工作流实例对象。在运行中，我们会根据刚刚定义的工作流来生成这些对象。
 
 加载工作流定义
 
@@ -64,7 +64,7 @@
     
 	workflow_spec.on("executed", event_log)
 
-实例化，启动工作流，运行之（run函数会执行到需要人工干预的结点为止，对于我们的流程，没有选择结点，都是自动流转结点，会一直执行到结束）
+实例化，启动工作流，运行之（run函数会重复执行到需要人工干预的结点为止，对于我们的流程，没有选择结点，都是自动流转结点，会一直执行到流程结束）
 
 	workflow = Workflow(workflow_spec)
 	workflow.start()
@@ -108,7 +108,7 @@
         end
     end        
 
-我们可以在task_spec或者workflow_spec中直接定义简单的execute代码，返回值DONE是表示通知工作流继续执行transfer到下一个结点的操作。代码的上下文中缺省的包括两个参数task, workflow, 分别是当前的任务 *实例*和工作流 *实例*。如果task_spec, workflow_spec 都定义了某个任务的代码，workflow_spec 中定义的代码，有更高的优先级。
+我们可以在task_spec或者workflow_spec中直接定义简单的execute代码，返回值DONE是表示通知工作流继续执行transfer到下一个结点的操作。代码的上下文中缺省的包括两个参数task, workflow, 分别是当前的任务实例和工作流实例。如果task_spec, workflow_spec中都定义了某个任务的代码，workflow_spec 中定义的代码，有更高的优先级。
 
 如果我们的逻辑很复杂，就不适合在此处直接撰写了。我们可以去增加一个新的TaskSpec类来做这个事。
 
@@ -145,9 +145,9 @@ Task S3 executed, defined in CustomClass.
 
 ### 怎么在工作流任务间中保留和传递数据
 
-有些时候，两步任务之间，需要有一些数据和参数交换，在redbreast中如何实现呢？
+有些时候，两步任务之间，会需要有一些数据交换，在redbreast中如何实现呢？
 
-数据定义有两种，一种是直接定义在spec文件中，比如直接写到task_spec里或者 workflow_spec，如下面的d1，d2, d3。这些数据会在所有的同一个spec生成的工作流之间共享，适用于一些配置项，固定参数之类，只读为主。如果某个工作流修改了其中的数据。其他的工作流也会得到新的数据。另一种，是在运行的代码中，通过set_data存储到task或者workflow的实例中去。我们可以根据运行态的数据不同，写入不同的数据。
+数据定义有两种方式，一种是直接定义在spec文件中，比如直接写到task_spec里或者 workflow_spec，如下面的d1，d2, d3。这些数据会在所有的同一个spec生成的工作流之间共享，适用于一些配置项，固定参数之类，只读为主。如果某个工作流修改了其中的数据。其他的工作流访问时也会得到新的数据。另一种，是在运行的代码中，通过set_data存储到task或者workflow的实例中去（这种数据只会影响。我们可以根据运行态的数据不同，写入不同的数据。
 
     task S1:
         d1 : s1-d1
@@ -186,8 +186,98 @@ Task S3 executed, defined in CustomClass.
 
 * 第二种数据
  - 任务实例, 读：get_data(key)，写：set_data(key, value)
- - 工作流实例，读：get_data(key)，写：set_data(key, value)
+ - 工作流实例，读：get_data(key)，写：set_data(key, value) 
 
-### 更复杂的例子，一个有分支的示例
+### 更复杂的例子，一个有分支流向的示例
 
-有了数据的传递，我们就可以动态的修改工作流的走向，下面我们来定义一个有简单分支的工作流，有两条分支，运行中，随机选择一条路径来走。
+有了数据的传递，我们就可以在运行态中修改工作流的走向，下面我们来定义一个有简单分支的工作流，有两条分支，运行中，随机选择一条路径来走。
+
+首先，定义spec如下：
+
+```
+    #第一步
+    task S1:
+        class: AutoChoiceTask
+    end
+
+    #第二步，分支A
+    task A:
+        code execute:
+            workflow.set_data("flow", "A")
+            return DONE
+        end
+    end
+
+    #第二步，B
+    task B:
+        default: True
+        code execute:
+            workflow.set_data("flow", "B")
+            return DONE
+        end
+    end
+
+    #第三步
+    task S2:
+    end
+
+    workflow ChoiceWorkflow01:
+
+        flows:
+            S1 -> A -> S2
+            S1 -> B -> S2
+        end
+
+    end
+```
+
+几点说明，分支选择结点，类选择为AutoChoiceTask，缺省的情况下，这个任务会根据用户设置在task实例上的next_tasks来选择流向进行流转。分成如下几种情况：
+
+* next_tasks 包含唯一流向，比如 ["A"], 选择流向"A"
+* next_tasks 包含多于一个流向，抛出异常
+* next_tasks 为空，spec中定义了default流向，选择流向"B"
+* next_tasks 为空，spec中未定义缺省流向，选择第一分支，选择流向"A"
+
+我们可以修改spec中的S1定义，加上随机选择流向的代码， 如下：
+
+```
+    #第一步
+    task S1:
+        class: AutoChoiceTask
+        code execute:
+            from random import randint
+            flow = ["A", "B"]
+            task.set_next_tasks(flow[randint(0,1)])
+            return DONE
+        end
+    end
+```
+
+也可以采用重定义类的方式，如下：
+
+```
+class RandomTask(AutoChoiceTask):
+
+    def default_choose(self, task, workflow):
+        from random import randint
+        flow = ["A", "B"]
+        return flow[randint(0, 1)]
+```
+
+这里，我们并没有定义default_execute, 而是定义了AutoChoiceTask的default_choose方法，缺省的default_choose 就是我们上面提及的逻辑，会读取next_tasks的返回值，你在这里覆盖缺省行为，可以直接返回流向名称。
+
+完整的程序见
+projects/BatchDemo/choise.py, 
+
+流程定义文件为
+projects/BatchDemo/spec/ChoiceWorkflow01.spec
+projects/BatchDemo/spec/ChoiceWorkflow02.spec
+
+### 更多的例子
+我们可以在BatchDemo中找到更多的例子：
+
+并行结点
+project/BatchDemo/split.py 
+
+多选分支
+project/BatchDemo/multi.py

@@ -22,7 +22,7 @@
     end
 
     #批处理
-    process BatchWorkflow02:
+    workflow BatchWorkflow02:
         #流向定义
         flows:
             S1 -> S2 -> S3 -> S4

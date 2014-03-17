@@ -2,8 +2,9 @@
     task S1:
         class: AutoChoiceTask
         code execute:
-            print "aaaa"
-            task.set_next_task("A")
+            from random import randint
+            flow = ["A", "B"]
+            task.set_next_tasks(flow[randint(0,1)])
             return DONE
         end
     end
@@ -11,7 +12,8 @@
     #第二步，分支A
     task A:
         code execute:
-            print "flow A"
+            #print "A"
+            workflow.set_data("flow", "A")
             return DONE
         end
     end
@@ -20,7 +22,8 @@
     task B:
         default: True
         code execute:
-            print "flow B"
+            #print "B"
+            workflow.set_data("flow", "B")
             return DONE
         end
     end
@@ -29,7 +32,7 @@
     task S2:
     end
 
-    workflow BatchWorkflow04:
+    workflow ChoiceWorkflow01:
 
         flows:
             S1 -> A -> S2

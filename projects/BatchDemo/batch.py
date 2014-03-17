@@ -29,12 +29,4 @@ workflow = Workflow(workflow_spec)
 workflow.start()
 workflow.run()       
 
-print "\n---- Workflow04 ------------------------------" 
-CoreWFManager.reset()
-workflow_spec = CoreWFManager.get_workflow_spec('BatchWorkflow04')
-workflow_spec.on("executed", event_log)
-
-workflow = Workflow(workflow_spec)
-workflow.start()
-workflow.run()       
 

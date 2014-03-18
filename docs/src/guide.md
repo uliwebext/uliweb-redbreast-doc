@@ -1,8 +1,6 @@
-# 快速上手
+# 快速上手之BatchDemo示例
 
-## BatchDemo示例 ##
-
-这一篇文章里，我们通过一点一点的修改 `BatchDemo` 例子，来了解一下`redbreast`中最基本的函数和用法。`BatchDemo` 是一个简单的 Python 程序，定义一个工作流，
+这一章里，我们通过一点一点的修改 `BatchDemo` 例子，来了解一下`redbreast`中最基本的函数和用法。`BatchDemo` 是一个简单的 Python 程序，定义一个工作流，
 完成一系列的任务。使用`redbreast`来加载各个任务，完成一个统一的流程。
 
 ## 定义流程 ##

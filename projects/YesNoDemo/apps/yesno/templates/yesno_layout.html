@@ -1,4 +1,4 @@
-{{extend "layout_container.html"}}
+{{extend "layout.html"}}
 
 {{block nav}}
     {{block menu}}
@@ -9,4 +9,17 @@
     .content.content-container{width:auto;margin-left:0px;}
 </style>
 
+{{end}}
+
+
+
+{{block content_main}}
+{{use "jquery", ui=True}}
+
+<script>
+    $(".content-container").removeClass("span10").addClass('span11')
+    $(".span2").hide()
+</script>
+    {{block content_main1}}
+    {{end}}
 {{end}}

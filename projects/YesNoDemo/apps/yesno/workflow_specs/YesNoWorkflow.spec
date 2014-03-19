@@ -1,5 +1,6 @@
 task CreateTask:
     class : simple_task
+    automatic: True
 end
 
 task ApproveTask:
@@ -16,7 +17,7 @@ task NoTask:
     automatic: True
 end
 
-process YesNoTask:
+workflow YesNoWorkflow:
     tasks:
         CreateTask  as C
         ApproveTask as A

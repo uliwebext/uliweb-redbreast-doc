@@ -1,18 +1,22 @@
 {{extend "yesno_layout.html"}}
 
-{{block content_main}}
-{{use "jquery", ui=True}}
+{{block content_tool}}
+    <a href="/yesno/add" class="btn btn-primary">创建YesNo流程</a>
+{{end}}
 
-<div class="content content-container">
+{{block content_main1}}
 
-    {{table_id='list_table'}}
-    {{include "inc_table.html"}}
-    {{use "jqutils"}}
-    {{import datetime}}
-    <script>
-        $(function(){
-            create_table("{{=request.path}}", download=false);
-        });
-    </script>
+<div class="content">
 </div>
+
+{{table_id='list_table'}}
+{{include "inc_table.html"}}
+{{use "jqutils"}}
+{{import datetime}}
+<script>
+    $(function(){
+        create_table("{{=request.path}}", download=false);
+    });
+</script>
+
 {{end}}

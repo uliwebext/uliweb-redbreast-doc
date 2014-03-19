@@ -9,6 +9,22 @@ def __begin__():
     from uliweb import functions
     return functions.require_login()
 
+def get_yesno_form(from_task, to_tasks):
+    from uliweb.form import Form, Button, TextField, HiddenField
+
+    btns = []
+    for k, v in to_tasks:
+        btns.append(Button(value=k, _class="btn btn-primary btnDeliver",
+            type='button', id='%s'%k))
+
+    class YesNoForm(Form):
+        form_buttons = btns
+        trans_message = TextField(label='流转意见', html_attrs={'style':'width:80%'}, required=True)
+        from_task_id = HiddenField(label='id',
+            html_attrs={'style':'display:none'}, default=from_task.get_unique_id())
+
+    return YesNoForm()    
+
 @expose('/yesno/')
 class YesNoView(object):
 
@@ -17,7 +33,11 @@ class YesNoView(object):
 
     def list(self):
         from uliweb.utils.generic import ListView, get_sort_field
-        fields_convert_map = {}
+
+        def id(value, obj):
+            return "<a href='/yesno/view/%d'>%d</a>" % (value, value)
+
+        fields_convert_map = {'id': id}
         view = ListView(self.model, fields_convert_map=fields_convert_map)
 
         if 'data' in request.values:
@@ -27,54 +47,23 @@ class YesNoView(object):
             result.update({'table':view})
             return result
 
-    def mylist(self):
-        from uliweb.utils.generic import ListView, get_sort_field
-        fields_convert_map = {'title': approve_title}
-        cond = (self.model.c.submitter == request.user.id)
-        view = ListView(self.model, condition=cond,
-            fields_convert_map=fields_convert_map)
-
-        if 'data' in request.values:
-            return json(view.json())
-        else:
-            result = view.run(head=True, body=False)
-            result.update({'table':view})
-            return result
-
-    def todolist(self):
-        from uliweb.utils.generic import ListView, get_sort_field
-        from sqlalchemy.sql import or_
-
-        fields_convert_map = {'title': approve_title}
-        helper = ApproveHelper()
-        spec_names = helper.get_task_spec_names(request.user)
-        cond = None
-        if len(spec_names) > 0:
-            cond = or_(*[self.model.c.task_spec_name == name for name in spec_names])
-        print cond
-
-        view = ListView(self.model, condition=cond,
-            fields_convert_map=fields_convert_map)
-
-        if 'data' in request.values:
-            return json(view.json())
-        else:
-            result = view.run(head=True, body=False)
-            result.update({'table':view})
-            return result
-
-    @decorators.check_permission('ApproveWorkflowCreate')
     def add(self):
         from uliweb.utils.generic import AddView
-        helper = ApproveHelper()
 
         def pre_save(data):
             data['submitter'] = request.user.id
             data['submitter_date'] = datetime.datetime.now()
 
         def post_save(obj, data):
-            helper.bind(obj)
-            helper.create_workflow()
+            from redbreast.middleware import Workflow, Task
+            workflow = Workflow.create("YesNoWorkflow", operator=request.user)
+
+            workflow.ref_unique_id = "yesno,%d" % obj.id
+            workflow.start()
+            workflow.run()
+
+            obj.workflow = workflow.get_id()
+            obj.save()
 
         view = AddView(self.model, url_for(self.__class__.list),
              pre_save=pre_save, post_save=post_save)
@@ -82,148 +71,74 @@ class YesNoView(object):
         result = view.run()
         return result
 
-    def edit(self, id):
-        from uliweb.utils.generic import EditView
-        from forms import ApproveEditForm
-        from uliweb.form.layout import BootstrapTableLayout
-
-        obj = self.model.get(int(id))
-        helper = ApproveHelper()
-        helper.bind(obj, get_workflow=True)
-        tasks = helper.get_active_tasks()
-        if len(tasks) == 1:
-            task_id = tasks[0].get_unique_id()
-            fields = [{'name': 'trans_message', 'verbose_name':'流转意见'}]
-
-            if helper.has_deliver_permission(tasks[0], request.user):
-
-                task_name = tasks[0].get_name()
-
-                form_cls = ApproveEditForm().get_form(task_name)
-                fields = form_cls.fields
-                layout = form_cls.layout
-                auto_fill_fields = form_cls.auto_fill_fields
-                if hasattr(form_cls, 'static_fields'):
-                    static_fields = form_cls.static_fields
-                else:
-                    static_fields = fields[0:-1]
-
-                def pre_save(obj, data):
-                    if auto_fill_fields:
-                        data[auto_fill_fields[0]] = request.user.id
-                        data[auto_fill_fields[1]] = datetime.datetime.now()
-
-                def post_created_form(fcls, model, obj):
-                    fcls.layout_class_args = {'table_class':'table width100'}
-                    fcls.layout_class = BootstrapTableLayout
-
-                view = EditView(self.model, url_for(self.__class__.view, id=id),
-                    fields=fields, static_fields = static_fields,
-                    post_created_form=post_created_form,
-                    obj=obj, pre_save=pre_save, layout=layout)
-                return view.run()
-            else:
-                flash(u"您没有权限访问编辑填写功能。")
-                return redirect(url_for(ApproveView.view, id=id))
-        else:
-            flash(u"您没有权限访问编辑填写功能。")
-            return redirect(url_for(ApproveView.view, id=id))
-
-
     def view(self, id):
         from uliweb.utils.generic import DetailView
-        from forms import ApproveEditForm
+        from redbreast.middleware import Workflow, Task
 
         obj = self.model.get(int(id))
 
-        helper = ApproveHelper()
-        helper.bind(obj, get_workflow=True)
+        workflow = Workflow.load(obj._workflow_, operator=request.user)
 
-        tasks = helper.get_active_tasks()
+        view = DetailView(self.model, obj=obj)
+        result = view.run()
 
-        if len(tasks) == 1:
+        data = {
+            'detailview': result['view'],
+            'obj': result['object'],
+            'workflow': workflow,
+            'task_desc': None,
+        }
 
-            task_id = tasks[0].get_unique_id()
-            task_name = tasks[0].get_name()
-            form_cls = ApproveEditForm().get_form(task_name)
-            auto_fill_fields = form_cls.auto_fill_fields
-            fields = form_cls.fields + auto_fill_fields
-            layout = form_cls.layout + auto_fill_fields
 
-            view = DetailView(self.model, obj=obj, fields=fields, layout=layout)
-            result = view.run()
-
-            data = {
-                'detailview': result['view'],
-                'obj': result['object'],
-                'workflow': helper.get_workflow(),
-            }
-
-            fields = [{'name': 'trans_message', 'verbose_name':'流转意见'}]
-
-            if helper.has_deliver_permission(tasks[0], request.user):
+        if workflow.is_running():
+            tasks = workflow.get_active_tasks()
+            if len(tasks) == 1:
                 next_tasks = tasks[0].get_next_tasks()
-                form = get_deliver_form(tasks[0], next_tasks)
-
                 data.update({
-                    'deliverform': form,
                     'show_deliver_form':True,
+                    'deliverform': get_yesno_form(tasks[0], next_tasks),
                     'task_desc': tasks[0].get_desc(),
-                    'task_name': tasks[0].get_name()
+                    'task_name': tasks[0].get_name(),
                 })
-
             else:
                 data.update({
                     'show_deliver_form':False,
-                    'task_desc': tasks[0].get_desc(),
-                    'task_name': tasks[0].get_name()
                 })
-
         else:
-            form_cls = ApproveEditForm().get_form("Archiver")
-            auto_fill_fields = form_cls.auto_fill_fields
-            fields = form_cls.fields + auto_fill_fields
-            layout = form_cls.layout + auto_fill_fields
-
-            view = DetailView(self.model, obj=obj, fields=fields, layout=layout)
-            result = view.run()
-
-            data = {
-                'detailview': result['view'],
-                'obj': result['object'],
-                'workflow': helper.get_workflow(),
-            }
-            data.update({
-                'show_deliver_form': False,
-                'task_desc': None
-            })
+            data.update({'show_deliver_form': False})
 
         return data
 
     def deliver(self, id):
+        from redbreast.middleware import Workflow, Task
+
         obj = self.model.get(int(id))
-        helper = ApproveHelper()
-        helper.bind(obj, get_workflow=True)
-        tasks = helper.get_active_tasks()
+        workflow = Workflow.load(obj._workflow_, operator=request.user)
 
-        if len(tasks) == 1:
-            task_id = tasks[0].get_unique_id()
-            next_tasks = tasks[0].get_next_tasks()
+        if workflow.is_running():
+            tasks = workflow.get_active_tasks()
+            if len(tasks) == 1:
+                task_id = tasks[0].get_unique_id()
+                next_tasks = tasks[0].get_next_tasks()
 
-            from_task_id = request.POST.get('from_task_id')
-            if from_task_id != task_id:
-                return json({'success': False, 'message': '无效的标识，请求的活动可能已经被他人流转。'})
+                from_task_id = request.POST.get('from_task_id')
+                if from_task_id != task_id:
+                    return json({'success': False, 'message': '无效的标识，请求的活动可能已经被他人流转。'})
 
-            trans_message = request.POST.get('trans_message', '')
-            if len(next_tasks)>1:
-                to_tasks = request.POST.get('to_tasks', None)
-                if not to_tasks:
+                trans_message = request.POST.get('trans_message', '')
+                to_task = request.POST.get('to_task', None)
+                if not to_task:
                     return json({'success': False, 'message': '无效的请求，您没有指定需要流转的流向。'})
 
-                helper.deliver(trans_message, next_tasks=[to_tasks])
-            else:
-                helper.deliver(trans_message)
+                tasks[0].deliver(trans_message, next_tasks=[to_task], async=False)
 
+                obj.approve_result = to_task
+                obj.approver = request.user.id
+                obj.approver_date =  datetime.datetime.now()
+
+                obj.save()
+
+                workflow.run()
 
             return json({'success': True})
         else:

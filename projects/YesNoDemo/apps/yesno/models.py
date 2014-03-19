@@ -9,9 +9,6 @@ class YesNo(Model):
     approver        = Reference('user', verbose_name='审核人')
     approver_date   = Field(datetime.datetime, verbose_name='审核时间')
     approve_result  = Field(str, max_length=100, verbose_name="审核结果")
-
-    task_spec_desc  = Field(str, max_length=255, verbose_name="当前阶段")
-    task_spec_name  = Field(str, max_length=100, verbose_name="当前阶段标识")
     workflow        = Reference('workflow', verbose_name='关联工作流', collection_name='yesno')
 
     class AddForm:
@@ -24,12 +21,16 @@ class YesNo(Model):
             'content',
         ]
 
+    class DetailView:
+        fields = [
+            'content', 'submitter', 'submitter_date', 'approve_result'
+        ]
+
     class Table:
         fields = [
-            {'name':'approve_result', 'width':30, 'sortable':True},
+            {'name':'id', 'width':40, 'sortable':True, 'verbose_name': '标识'},
+            {'name':'approve_result', 'width':100, 'sortable':True},
             {'name':'content', 'width':100, 'sortable':True},
-            {'name':'task_spec_desc', 'width':100, 'sortable':True},
-            {'name':'task_spec_name', 'width':100, 'sortable':True},
             {'name':'submitter', 'width':100, 'sortable':True},
             {'name':'submitter_date', 'width':100, 'sortable':True},
             {'name':'approver', 'width':100, 'sortable':True},

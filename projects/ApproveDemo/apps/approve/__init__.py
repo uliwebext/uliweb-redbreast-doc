@@ -16,10 +16,6 @@ def workflow_task_enter(event):
                 obj.task_spec_name = event.task.get_name()
                 obj.save()
 
-
-
-
-
 def workflow_running(event):
     if hasattr(event, 'workflow'):
         pass

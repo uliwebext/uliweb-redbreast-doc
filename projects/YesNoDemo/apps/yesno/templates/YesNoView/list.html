@@ -1,0 +1,18 @@
+{{extend "yesno_layout.html"}}
+
+{{block content_main}}
+{{use "jquery", ui=True}}
+
+<div class="content content-container">
+
+    {{table_id='list_table'}}
+    {{include "inc_table.html"}}
+    {{use "jqutils"}}
+    {{import datetime}}
+    <script>
+        $(function(){
+            create_table("{{=request.path}}", download=false);
+        });
+    </script>
+</div>
+{{end}}

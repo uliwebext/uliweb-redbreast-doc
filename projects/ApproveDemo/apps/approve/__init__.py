@@ -10,7 +10,10 @@ def workflow_task_enter(event):
     if hasattr(event, 'workflow'):
         wf = event.workflow
         if not wf.deserializing:
-            obj = get_approve_obj(wf.get_data('obj_id'))
+
+            ref_unique_id = wf.ref_unique_id
+            obj_id = ref_unique_id.split("-")[1]
+            obj = get_approve_obj(obj_id)
             if obj:
                 obj.task_spec_desc = event.task.get_desc()
                 obj.task_spec_name = event.task.get_name()

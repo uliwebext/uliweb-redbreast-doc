@@ -219,7 +219,11 @@ class ApproveView(object):
                 })
 
         else:
-            form_cls = ApproveEditForm().get_form("Archiver")
+            if not helper.workflow_is_running():
+                formClass = "Archiver"
+            else:
+                formClass = obj.task_spec_name
+            form_cls = ApproveEditForm().get_form(formClass)
             auto_fill_fields = form_cls.auto_fill_fields
             fields = form_cls.fields + auto_fill_fields
             layout = form_cls.layout + auto_fill_fields

@@ -106,11 +106,11 @@
         end
     end        
 
-我们可以在task_spec或者workflow_spec中直接定义简单的execute代码，返回值DONE是表示通知工作流继续执行transfer到下一个结点的操作。代码的上下文中缺省的包括两个参数task, workflow, 分别是当前的任务实例和工作流实例。如果task_spec, workflow_spec中都定义了某个任务的代码，workflow_spec 中定义的代码，有更高的优先级。
+我们可以在 task_spec 或者 workflow_spec 中直接定义简单的 execute 代码，返回值 DONE 是表示通知工作流继续执行 transfer 到下一个结点的操作。代码的上下文中缺省的包括两个参数 task, workflow, 分别是当前的任务实例和工作流实例。如果 task_spec, workflow_spec 中都定义了某个任务的代码，workflow_spec 中定义的代码，有更高的优先级。
 
 如果我们的逻辑很复杂，就不适合在此处直接撰写了。我们可以去增加一个新的TaskSpec类来做这个事。
 
-方法二，使用自定义的TaskSpec类，重写default_execute方法，示例如下：
+方法二，使用自定义的 TaskSpe c类，重写`default_execute`方法，示例如下：
 
 ```
 from redbreast.core.spec import AutoSimpleTask
@@ -122,7 +122,7 @@ class CustomTask(AutoSimpleTask):
         return DONE
 ```
 
-然后修改spec文件中的task_spec:S3的任务如下：
+如果保存的文件名称为mytask.py，然后修改spec文件中的task_spec:S3的任务如下：
 
     #第三步
     task S3:
@@ -143,9 +143,9 @@ Task S3 executed, defined in CustomClass.
 
 ### 怎么在工作流任务间中保留和传递数据
 
-有些时候，两步任务之间，会需要有一些数据交换，在redbreast中如何实现呢？
+有些时候，两步任务之间，会需要有一些数据交换，在 redbreast 中如何实现呢？
 
-数据定义有两种方式，一种是直接定义在spec文件中，比如直接写到task_spec里或者 workflow_spec，如下面的d1，d2, d3。这些数据会在所有的同一个spec生成的工作流之间共享，适用于一些配置项，固定参数之类，只读为主。如果某个工作流修改了其中的数据。其他的工作流访问时也会得到新的数据。另一种，是在运行的代码中，通过set_data存储到task或者workflow的实例中去（这种数据只会影响。我们可以根据运行态的数据不同，写入不同的数据。
+数据定义有两种方式，一种是直接定义在spec文件中，比如直接写到task_spec里或者 workflow_spec，如下面的d1，d2, d3。这些数据会在所有的同一个spec生成的工作流之间共享，适用于一些配置项，固定参数之类，只读为主。如果某个工作流修改了其中的数据。其他的工作流访问时也会得到新的数据。另一种，是在运行的代码中，通过set_data存储到task或者workflow的实例中去（这种数据只会影响当前实例）。我们可以根据运行态的数据不同，写入不同的数据。
 
     task S1:
         d1 : s1-d1
@@ -176,15 +176,17 @@ Task S3 executed, defined in CustomClass.
         end
     end
 
-使用的方法如下：
+上面的例子中，d1, d2, d3是spec上的数据，c1，c2则是实例上的数据。
 
-* 第一种数据
- - 任务实例, 读：get_spec_data(key)，写：set_spec_data(key, value)
- - 工作流实例，读：get_spec_data(key)，写：set_spec_data(key, value)
+具体使用的方法如下：
 
-* 第二种数据
- - 任务实例, 读：get_data(key)，写：set_data(key, value)
- - 工作流实例，读：get_data(key)，写：set_data(key, value) 
+* 第一种数据，spec上的数据
+    - 任务实例, 读：get_spec_data(key)，写：set_spec_data(key, value)
+    - 工作流实例，读：get_spec_data(key)，写：set_spec_data(key, value)
+
+* 第二种数据，实例上的数据
+    - 任务实例, 读：get_data(key)，写：set_data(key, value)
+    - 工作流实例，读：get_data(key)，写：set_data(key, value) 
 
 ### 更复杂的例子，一个有分支流向的示例
 
@@ -229,7 +231,7 @@ Task S3 executed, defined in CustomClass.
     end
 ```
 
-几点说明，分支选择结点，类选择为AutoChoiceTask，缺省的情况下，这个任务会根据用户设置在task实例上的next_tasks来选择流向进行流转。分成如下几种情况：
+几点说明，分支选择结点，类选为AutoChoiceTask，缺省的情况下，这个任务会根据用户设置在task实例上的next_tasks来选择流向进行流转。分成如下几种情况：
 
 * next_tasks 包含唯一流向，比如 ["A"], 选择流向"A"
 * next_tasks 包含多于一个流向，抛出异常
@@ -250,8 +252,21 @@ Task S3 executed, defined in CustomClass.
         end
     end
 ```
+或者
 
-也可以采用重定义类的方式，如下：
+```
+    #第一步
+    task S1:
+        class: AutoChoiceTask
+        code choose:
+            from random import randint
+            flow = ["A", "B"]
+            return [flow[randint(0,1)]]
+        end
+    end
+```
+
+也可以采用继承子类，重定义`default_choose`的方式，如下：
 
 ```
 class RandomTask(AutoChoiceTask):
@@ -262,12 +277,13 @@ class RandomTask(AutoChoiceTask):
         return flow[randint(0, 1)]
 ```
 
-这里，我们并没有定义default_execute, 而是定义了AutoChoiceTask的default_choose方法，缺省的default_choose 就是我们上面提及的逻辑，会读取next_tasks的返回值，你在这里覆盖缺省行为，可以直接返回流向名称。
+这里，我们并没有定义default_execute, 而是定义了 AutoChoiceTask 的 default_choose 方法，缺省的 default_choose 就是我们上面提及的逻辑，会读取next_tasks的返回值，你在这里覆盖了缺省行为，可以根据我们的需求直接返回流向名称列表。
 
 完整的程序见
 projects/BatchDemo/choise.py, 
 
 流程定义文件为
+
 projects/BatchDemo/spec/ChoiceWorkflow01.spec
 projects/BatchDemo/spec/ChoiceWorkflow02.spec
 

@@ -27,7 +27,7 @@ class ApproveHelper(object):
     def create_workflow(self, start=True):
         #create new workflow
         workflow = Workflow.create(WORKFLOW_SPEC_NAME, operator=self.operator)
-        workflow.set_data({'table': 'approve', 'obj_id': self._approve.id})
+        workflow.ref_unique_id = "approve-%d" % self._approve.id
 
         if start:
             workflow.start()
@@ -45,6 +45,9 @@ class ApproveHelper(object):
             async = True
             return self._workflow.deliver(self._current_task.uuid,
                 message=message, next_tasks=next_tasks, async=async)
+
+    def workflow_is_running(self):
+        return self._workflow.is_running()
 
 
     def get_active_tasks(self):

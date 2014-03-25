@@ -112,7 +112,7 @@ redbreast包，目前包括了五个app：
     - 作为uliweb app使用时，支持spec保存到数据库
     - 提供uliweb命令 clearspec, syncspec, reloadspec
 
-* `redbreast.middleware`
+* `redbreast.serializable
     - 提供对工作流实例对象的序列化支持
     - 支持通过uliweb settings方式，配置spec的事件响应
 
@@ -132,7 +132,7 @@ redbreast包，目前包括了五个app：
     INSTALLED_APPS = [
         #------ redbreast -----------------------
         'redbreast.core',
-        'redbreast.middleware',
+        'redbreast.serializable',
         'redbreast.ui',
         'redbreast.daemon',
         'redbreast.moniter',

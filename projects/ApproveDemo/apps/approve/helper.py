@@ -1,5 +1,5 @@
 
-from redbreast.middleware import Workflow, Task
+from redbreast.serializable import Workflow, Task
 
 WORKFLOW_SPEC_NAME = "ApproveWorkflow"
 

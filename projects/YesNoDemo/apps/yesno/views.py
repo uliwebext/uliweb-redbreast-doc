@@ -55,7 +55,8 @@ class YesNoView(object):
             data['submitter_date'] = datetime.datetime.now()
 
         def post_save(obj, data):
-            from redbreast.middleware import Workflow, Task
+            Workflow = functions.get_workflow()
+
             workflow = Workflow.create("YesNoWorkflow", operator=request.user)
 
             workflow.ref_unique_id = "yesno,%d" % obj.id
@@ -73,7 +74,7 @@ class YesNoView(object):
 
     def view(self, id):
         from uliweb.utils.generic import DetailView
-        from redbreast.middleware import Workflow, Task
+        Workflow = functions.get_workflow()
 
         obj = self.model.get(int(id))
 
@@ -110,8 +111,8 @@ class YesNoView(object):
         return data
 
     def deliver(self, id):
-        from redbreast.middleware import Workflow, Task
 
+        Workflow = functions.get_workflow()
         obj = self.model.get(int(id))
         workflow = Workflow.load(obj._workflow_, operator=request.user)
 

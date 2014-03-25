@@ -8,7 +8,7 @@ redbreast包，目前包括了五个app：
     - 作为uliweb app使用时，支持spec保存到数据库
     - 提供uliweb命令 clearspec, syncspec, reloadspec
 
-* `redbreast.middleware`
+* `redbreast.serializable
     - 提供对工作流实例对象的序列化支持
     - 支持通过uliweb settings方式，配置spec的事件响应
 
@@ -28,7 +28,7 @@ redbreast包，目前包括了五个app：
     INSTALLED_APPS = [
         #------ redbreast -----------------------
         'redbreast.core',
-        'redbreast.middleware',
+        'redbreast.serializable',
         'redbreast.ui',
         'redbreast.daemon',
         'redbreast.moniter',
@@ -114,7 +114,9 @@ workflow字段，构造了一个用户数据表和工作流实例记录表之间
 ```
     def post_save(obj, data):
         # import 
-        from redbreast.middleware import Workflow, Task
+        from redbreast.serializable import Workflow, Task
+	# or use functions
+	# Workflow = functions.get_workflow()
 
         # create workflow
         workflow = Workflow.create("YesNoWorkflow", operator=request.user)
@@ -131,7 +133,7 @@ workflow字段，构造了一个用户数据表和工作流实例记录表之间
 
 几点说明：
 
- * Workflow对象是来自 redbreast.middleware, 而不是之前的 redbreast.core, 前者有数据库的支持，任务工作流状态的变化，会插入或者更新相关的数据库记录。
+ * Workflow对象是来自 redbreast.serializable, 而不是之前的 redbreast.core, 前者有数据库的支持，任务工作流状态的变化，会插入或者更新相关的数据库记录。
  * ref_unique_id 用来形成工作流反查数据表的唯一标识，字符串类型
 
 ### 流转
